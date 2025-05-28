@@ -1,0 +1,30 @@
+CREATE DATABASE IF NOT EXISTS dataflow;
+
+USE dataflow;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    note TEXT,
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '0-正常 1-注销',
+    role VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT 'admin/user'
+);
+
+CREATE TABLE IF NOT EXISTS files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(255) NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+
+CREATE TABLE IF NOT EXISTS register_tables (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    note TEXT,
+    approve TINYINT NOT NULL DEFAULT 0 COMMENT '0-待审批 1-通过 2-拒绝'
+);

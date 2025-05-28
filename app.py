@@ -4,7 +4,6 @@ from utils import generate_token, verify_token, hash_password, check_password
 from config import Config
 from functools import wraps
 import os
-from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
 from datetime import datetime
@@ -16,7 +15,6 @@ CORS(app)
 init_db(app)
 
 
-# ================== 管理员权限校验装饰器 ==================
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -229,7 +227,7 @@ def upload_file():
 
     # 生成时间戳文件名（保留原始扩展名）
     original_ext = os.path.splitext(file.filename)[1]
-    timestamp = datetime.now().isoformat().replace(":", "_")  # 替换冒号避免文件系统问题
+    timestamp = datetime.now().isoformat().replace(":", "_")
     new_filename = f"{timestamp}{original_ext}"
 
     # 存储文件
@@ -246,7 +244,7 @@ def upload_file():
     }), 201
 
 
-@app.route('/download', methods=['GET'])  # 修改路由去掉file_id
+@app.route('/download', methods=['GET'])
 def download_file():
     token = request.args.get('token')
     user_id = verify_token(token)

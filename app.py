@@ -142,11 +142,28 @@ def approve_registration():
 
 
 @app.route('/admin/disable_user', methods=['POST'])
-@admin_required
 def disable_user():
     user_id = request.form.get('user_id')
-    User.update_status(user_id, 1)
-    return jsonify({'message': '用户已注销'})
+
+    try:
+        user = User.get_by_id(user_id)
+        if not user:
+            return jsonify({"code": 404, "message": "用户不存在"}), 404
+
+        # 校验管理员权限
+        if user[4] == 'admin':
+            return jsonify({"code": 403, "message": "管理员账户不可注销"}), 403
+
+        # 校验当前状态
+        if user[3] == 1:
+            return jsonify({"code": 409, "message": "用户已注销，无需重复操作"}), 409
+
+        User.update_status(user_id, 1)
+        return jsonify({"code": 200, "message": "用户注销成功"})
+
+    except Exception as e:
+        app.logger.error(f"数据库操作失败: {str(e)}")
+        return jsonify({"code": 500, "message": "服务器内部错误"}), 500
 
 
 @app.route('/admin/update_note', methods=['POST'])
@@ -356,6 +373,14 @@ def getString_tech_doc():
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+
+@app.route('/public/images/<filename>')
+def serve_image(filename):
+    print(filename)
+    return send_from_directory(
+        os.path.join(app.config['PUBLIC_FOLDER'], 'images'),
+        filename
+    )
 
 
 if __name__ == '__main__':

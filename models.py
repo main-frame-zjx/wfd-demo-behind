@@ -45,6 +45,12 @@ class User:
         user = cursor.fetchone()
         return user if user else None
 
+    def get_by_id(id):
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT id, username, password_hash, status, role FROM users WHERE id = %s', (id,))
+        user = cursor.fetchone()
+        return user if user else None
+
     @staticmethod
     def get_all_user():
         cursor = mysql.connection.cursor()

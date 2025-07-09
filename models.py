@@ -3,6 +3,7 @@ import uuid
 import os
 from config import Config
 from dataclasses import dataclass
+from datetime import datetime  # 新增导入
 
 mysql = MySQL()
 
@@ -84,40 +85,122 @@ class FileInfo:
     id: int
     filename: str
     filepath: str
+    uploaded_at: datetime
 
 class File:
-    @staticmethod
-    def get_latest_user_file(user_id):
-        cursor = mysql.connection.cursor()
-        cursor.execute('''
-                SELECT id, filename, filepath 
-                FROM files 
-                WHERE user_id = %s 
-                ORDER BY id DESC 
-                LIMIT 1
-            ''', (user_id,))
-        result = cursor.fetchone()
-        return FileInfo(*result) if result else None
+
 
     @staticmethod
     def save_file(user_id, filename, filepath):
+        """保存用户文件记录到数据库"""
         cursor = mysql.connection.cursor()
+
+        # Step1: 检查文件名冲突
         cursor.execute('''
-            INSERT INTO files (user_id, filename, filepath)
-            VALUES (%s, %s, %s)
-        ''', (user_id, filename, filepath))
+            SELECT filename FROM files 
+            WHERE user_id = %s AND filename = %s
+        ''', (user_id, filename))
+        if cursor.fetchone():
+            raise ValueError(f"文件 '{filename}' 已存在")
+
+        uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 格式化为MySQL可识别的字符串
+
+        # Step2: 插入新记录
+        cursor.execute('''
+            INSERT INTO files (user_id, filename, filepath, uploaded_at)
+            VALUES (%s, %s, %s, %s)
+        ''', (user_id, filename, filepath, uploaded_at))
         mysql.connection.commit()
-        return cursor.lastrowid
+        return True
 
     @staticmethod
-    def get_user_file(user_id, file_id):
+    def overwrite_file(user_id, filename, filepath):
+        cursor = mysql.connection.cursor()
+        try:
+            # Step1: 检查记录是否存在
+            cursor.execute('''
+                        SELECT id, filepath FROM files 
+                        WHERE user_id = %s AND filename = %s
+                    ''', (user_id, filename))
+            existing_file = cursor.fetchone()
+
+            if not existing_file:
+                raise FileNotFoundError(f"文件 '{filename}' 不存在")
+
+            old_filepath = existing_file[1]  # 获取旧文件路径
+            uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 更新时间戳
+
+            # Step2: 更新记录
+            cursor.execute('''
+                        UPDATE files 
+                        SET filepath = %s, uploaded_at = %s 
+                        WHERE id = %s
+                    ''', (filepath, uploaded_at, existing_file[0]))
+            mysql.connection.commit()
+
+            # Step3: 删除旧文件
+            # try:
+            #     if os.path.exists(old_filepath):
+            #         os.remove(old_filepath)  # 删除旧文件释放空间
+            # except Exception as e:
+            #     print(f"删除旧文件失败: {e}")  # 日志记录但不中断流程
+
+            return True
+        except Exception as e:
+            mysql.connection.rollback()
+            print(f"覆盖文件失败: {e}")
+            raise
+
+    @staticmethod
+    def delete_file(user_id, filename):
+        """删除用户文件记录及物理文件"""
+        cursor = mysql.connection.cursor()
+
+        # Step1: 检查文件是否存在
+        cursor.execute('''
+                SELECT filepath FROM files 
+                WHERE user_id = %s AND filename = %s
+            ''', (user_id, filename))
+        file_record = cursor.fetchone()
+        if not file_record:
+            raise FileNotFoundError(f"文件 '{filename}' 不存在")
+
+        # Step2: 从数据库删除记录
+        cursor.execute('''
+                DELETE FROM files 
+                WHERE user_id = %s AND filename = %s
+            ''', (user_id, filename))
+        mysql.connection.commit()
+
+        # Step3: 删除物理文件
+        file_path = file_record[0]
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"删除文件失败: {e}")
+            raise RuntimeError("文件删除异常，请检查服务器权限")
+
+    @staticmethod
+    def get_user_files(user_id):
+        """获取用户所有文件信息"""
         cursor = mysql.connection.cursor()
         cursor.execute('''
-            SELECT id, filename, filepath 
-            FROM files 
-            WHERE id = %s AND user_id = %s
-        ''', (file_id, user_id))
-        return cursor.fetchone()
+                SELECT id, filename, filepath, uploaded_at FROM files 
+                WHERE user_id = %s
+            ''', (user_id,))
+        return [FileInfo(*row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_user_file(user_id, filename):
+        """获取用户所有文件信息"""
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+                    SELECT id, filepath, uploaded_at FROM files 
+                    WHERE user_id = %s AND filename = %s
+                ''', (user_id,filename))
+        return cursor.fetchone()[1]
+
 
 
 class Register:

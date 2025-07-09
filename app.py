@@ -188,47 +188,9 @@ def login():
     return jsonify({'error': 'Invalid credentials'}), 401
 
 
-# @app.route('/upload', methods=['POST'])
-# def upload_file():
-#     token = request.form.get('token')
-#     user_id = verify_token(token)
-#     if not user_id:
-#         return jsonify({'error': 'Invalid or expired token'}), 401
-#
-#     if 'file' not in request.files:
-#         return jsonify({'error': 'No file part'}), 400
-#
-#     file = request.files['file']
-#     if file.filename == '':
-#         return jsonify({'error': 'No selected file'}), 400
-#
-#     filename = secure_filename(file.filename)
-#     save_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(user_id))
-#     os.makedirs(save_dir, exist_ok=True)
-#     filepath = os.path.join(save_dir, filename)
-#     file.save(filepath)
-#
-#     File.save_file(user_id, filename, filepath)
-#     return jsonify({'message': 'File uploaded successfully'}), 201
-#
-#
-# @app.route('/download/<int:file_id>', methods=['GET'])
-# def download_file(file_id):
-#     token = request.args.get('token')
-#     user_id = verify_token(token)
-#     if not user_id:
-#         return jsonify({'error': 'Invalid or expired token'}), 401
-#
-#     file_info = File.get_user_file(user_id, file_id)
-#     if not file_info:
-#         return jsonify({'error': 'File not found'}), 404
-#
-#     directory = os.path.dirname(file_info[2])
-#     filename = os.path.basename(file_info[2])
-#     return send_from_directory(directory, filename, as_attachment=True)
 
 
-@app.route('/upload', methods=['POST'])
+@app.route('/uploadWorkspace', methods=['POST'])
 def upload_file():
     token = request.form.get('token')
     user_id = verify_token(token)
@@ -242,6 +204,12 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
+    filename = request.form.get('filename')
+    if filename == '' or filename is None:
+        return jsonify({
+            'message': 'workspace name can not be none'
+        }), 402
+
     # 生成时间戳文件名（保留原始扩展名）
     original_ext = os.path.splitext(file.filename)[1]
     timestamp = datetime.now().isoformat().replace(":", "_")
@@ -254,31 +222,96 @@ def upload_file():
     file.save(filepath)
 
     # 记录到数据库（需要修改File模型）
-    File.save_file(user_id, new_filename, filepath)
+    try:
+        File.save_file(user_id, filename, filepath)
+    except ValueError as e:
+        return jsonify({
+            'message': 'workspace name duplicate'
+        }), 402
     return jsonify({
         'message': 'File uploaded successfully',
         'filename': new_filename
     }), 201
 
 
-@app.route('/download', methods=['GET'])
-def download_file():
-    token = request.args.get('token')
+
+@app.route('/overwriteWorkspace', methods=['POST'])
+def overwriteWorkspace():
+    token = request.form.get('token')
     user_id = verify_token(token)
     if not user_id:
         return jsonify({'error': 'Invalid or expired token'}), 401
 
-    # 获取最新文件
-    file_info = File.get_latest_user_file(user_id)
-    if not file_info:
-        return jsonify({'error': 'No files found'}), 404
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
 
-    directory = os.path.dirname(file_info.filepath)
-    filename = os.path.basename(file_info.filepath)
-    return send_from_directory(directory, filename, as_attachment=True)
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    filename = request.form.get('filename')
+    if filename == '' or filename is None:
+        return jsonify({
+            'message': 'workspace name can not be none'
+        }), 402
+
+    # 生成时间戳文件名（保留原始扩展名）
+    original_ext = os.path.splitext(file.filename)[1]
+    timestamp = datetime.now().isoformat().replace(":", "_")
+    new_filename = f"{timestamp}{original_ext}"
+
+    # 存储文件
+    save_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(user_id))
+    os.makedirs(save_dir, exist_ok=True)
+    filepath = os.path.join(save_dir, new_filename)
+    file.save(filepath)
+
+    # 记录到数据库（需要修改File模型）
+    try:
+        File.overwrite_file(user_id, filename, filepath)
+    except ValueError as e:
+        return jsonify({
+            'message': 'workspace name duplicate'
+        }), 402
+    return jsonify({
+        'message': 'File uploaded successfully',
+        'filename': new_filename
+    }), 201
 
 
-@app.route('/has_workspace', methods=['GET'])
+# @app.route('/downloadWorkspace', methods=['GET'])
+# def downloadWorkspace():
+#     token = request.args.get('token')
+#     user_id = verify_token(token)
+#     if not user_id:
+#         return jsonify({'error': 'Invalid or expired token'}), 401
+#
+#     # 获取最新文件
+#     file_info = File.get_latest_user_file(user_id)
+#     if not file_info:
+#         return jsonify({'error': 'No files found'}), 404
+#
+#     directory = os.path.dirname(file_info.filepath)
+#     filename = os.path.basename(file_info.filepath)
+#     return send_from_directory(directory, filename, as_attachment=True)
+
+
+# @app.route('/has_workspace', methods=['GET'])
+# def has_workspace():
+#     token = request.args.get('token')
+#     user_id = verify_token(token)
+#     if not user_id:
+#         return jsonify({'error': 'Invalid or expired token'}), 401
+#
+#     # 检查用户是否有上传的文件
+#     cursor = mysql.connection.cursor()
+#     cursor.execute('SELECT COUNT(*) FROM files WHERE user_id = %s', (user_id,))
+#     count = cursor.fetchone()[0]
+#
+#     return jsonify({'has_workspace': count > 0})
+
+
+@app.route('/get_workspace', methods=['GET'])
 def has_workspace():
     token = request.args.get('token')
     user_id = verify_token(token)
@@ -286,29 +319,30 @@ def has_workspace():
         return jsonify({'error': 'Invalid or expired token'}), 401
 
     # 检查用户是否有上传的文件
+    files = File.get_user_files(user_id)
     cursor = mysql.connection.cursor()
     cursor.execute('SELECT COUNT(*) FROM files WHERE user_id = %s', (user_id,))
-    count = cursor.fetchone()[0]
-
-    return jsonify({'has_workspace': count > 0})
+    return jsonify({'files': files})
 
 
-@app.route('/download_json', methods=['GET'])
-def download_file_json():
+@app.route('/download_json_workspace', methods=['GET'])
+def download_json_workspace():
     token = request.args.get('token')
+    filename = request.args.get('filename')
     user_id = verify_token(token)
     if not user_id:
         return jsonify({'error': 'Invalid or expired token'}), 401
 
-    file_info = File.get_latest_user_file(user_id)
-    if not file_info:
+    file_path = File.get_user_file(user_id,filename)
+    print(file_path)
+    if not file_path:
         return jsonify({'error': 'No files found'}), 404
 
     try:
-        with open(file_info.filepath, 'r') as f:
+        with open(file_path, 'r') as f:
             file_content = json.load(f)
             return jsonify({
-                'filename': file_info.filename,
+                'filename': filename,
                 'content': file_content
             })
     except json.JSONDecodeError:
@@ -384,4 +418,4 @@ def serve_image(filename):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0' ,debug=True, port=5000)
+    app.run(host='0.0.0.0' ,debug=True, port=5001)

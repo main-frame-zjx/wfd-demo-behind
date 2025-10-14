@@ -24,7 +24,7 @@ def ensure_upload_dir(app):
         os.makedirs(Config.UPLOAD_FOLDER)
 
 class User:
-    # 用于直接添加用户，是一个后门
+    # add a user
     @staticmethod
     def create(username, password_hash,role):
         cursor = mysql.connection.cursor()
@@ -46,6 +46,7 @@ class User:
         user = cursor.fetchone()
         return user if user else None
 
+    @staticmethod
     def get_by_id(id):
         cursor = mysql.connection.cursor()
         cursor.execute('SELECT id, username, password_hash, status, role FROM users WHERE id = %s', (id,))
@@ -78,6 +79,16 @@ class User:
                 WHERE id = %s
             ''', (new_note, user_id))
         mysql.connection.commit()
+
+    @staticmethod
+    def get_role_by_id(user_id):
+        cursor = mysql.connection.cursor()
+        cursor.execute('''
+                    SELECT role FROM users 
+                    WHERE id = %s AND status = 0
+                ''', (user_id,))
+        user = cursor.fetchone()
+        return user
 
 
 @dataclass
@@ -228,3 +239,32 @@ class Register:
             WHERE approve = %s
         ''', (approve_status,))
         return cursor.fetchall()
+
+    @staticmethod
+    def get_by_reg_id(reg_id):
+        # 获取注册请求详情
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT * FROM register_tables WHERE id = %s', (reg_id,))
+        reg = cursor.fetchone()
+        return reg
+
+    @staticmethod
+    def approve_register(reg_id):
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT * FROM register_tables WHERE id = %s', (reg_id,))
+        reg = cursor.fetchone()
+        # 创建用户
+        cursor.execute('''
+                INSERT INTO users 
+                (username, password_hash, note, role)
+                VALUES (%s, %s, %s, 'user')
+            ''', (reg[1], reg[2], reg[3]))
+
+        # 更新注册状态
+        cursor.execute('''
+                UPDATE register_tables 
+                SET approve = 1 
+                WHERE id = %s
+            ''', (reg_id,))
+        mysql.connection.commit()
+        return reg

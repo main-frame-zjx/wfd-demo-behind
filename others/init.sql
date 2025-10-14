@@ -1,6 +1,6 @@
-CREATE DATABASE IF NOT EXISTS dataflow;
+CREATE DATABASE IF NOT EXISTS dataflow_demo;
 
-USE dataflow;
+USE dataflow_demo;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -28,3 +28,6 @@ CREATE TABLE IF NOT EXISTS register_tables (
     note TEXT,
     approve TINYINT NOT NULL DEFAULT 0 COMMENT '0-待审批 1-通过 2-拒绝'
 );
+
+
+INSERT INTO `users` VALUES (1, 'admin', 'scrypt:32768:8:1$Sp3iqtfSqELDbtYV$c6f9b7f755758f046c69a03e72fd19e574f7b1f056c93a8a21675467086e95a3f4a1c4b5f890283deebdff48acf5565cb922e3bd42fbb7554e9e5eda8dd72b92', NULL, 0, 'admin');

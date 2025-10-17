@@ -88,12 +88,6 @@ def registrations():
     registrations = Register.get_by_approve(approve_status)
     return jsonify({'array': registrations})
 
-@app.route('/admin/getUsers', methods=['GET'])
-@admin_required
-def getUsers():
-    users = User.get_all_user()
-    return jsonify({'array': users})
-
 @app.route('/admin/approve', methods=['GET'])
 @admin_required
 def approve():
@@ -106,6 +100,12 @@ def approve():
 
     Register.approve_register(reg_id)
     return jsonify({'message': '审批通过'})
+
+@app.route('/admin/getUsers', methods=['GET'])
+@admin_required
+def getUsers():
+    users = User.get_all_user()
+    return jsonify({'array': users})
 
 @app.route('/admin/disable_user', methods=['POST'])
 @admin_required
@@ -257,16 +257,6 @@ def download_json_workspace():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/download/intro', methods=['GET'])
-@login_required
-def download_intro():
-    return send_from_directory(Config.PUBLIC_FOLDER, 'intro.pdf', as_attachment=True)
-
-@app.route('/download/tech-doc', methods=['GET'])
-@login_required
-def download_tech_doc():
-    return send_from_directory(Config.PUBLIC_FOLDER, 'tech_doc.pdf', as_attachment=True)
-
 @app.route('/getString/intro', methods=['GET'])
 @login_required
 def getString_intro():
@@ -294,6 +284,16 @@ def getString_tech_doc():
     except Exception as e:
         app.logger.error(f"文档读取失败: {str(e)}")
         return jsonify({'error': '服务器内部错误'}), 500
+
+# @app.route('/download/intro', methods=['GET'])
+# @login_required
+# def download_intro():
+#     return send_from_directory(Config.PUBLIC_FOLDER, 'intro.pdf', as_attachment=True)
+#
+# @app.route('/download/tech-doc', methods=['GET'])
+# @login_required
+# def download_tech_doc():
+#     return send_from_directory(Config.PUBLIC_FOLDER, 'tech_doc.pdf', as_attachment=True)
 
 @app.route('/public/images/<filename>')
 def serve_image(filename):
